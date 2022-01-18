@@ -2,39 +2,36 @@ use std::thread;
 
 const THRESHOLD: usize = 3;
 
-fn double (x: i32) -> i32 { 
-    x * 2 
+fn double(x: i32) -> i32 {
+    x * 2
 }
 
-fn uppercase (x: &str) -> String { 
+fn uppercase(x: &str) -> String {
     x.to_uppercase().to_string()
 }
 
-fn helper <T, R>(input: Vec<T> , f: fn(T) -> R) -> Vec<R>
-where 
-    T: Send + Sync + std::fmt::Debug + Copy + 'static,
-    R: Send + Sync + std::fmt::Debug + 'static
-{
+fn process<T, R>(input: Vec<T>, f: fn(T) -> R) -> Vec<R> {
+    input.into_iter().map(f).collect()
+}
 
+fn helper<T, R>(input: Vec<T>, f: fn(T) -> R) -> Vec<R>
+where
+    T: Send + std::fmt::Debug + Clone + 'static,
+    R: Send + std::fmt::Debug + 'static,
+{
     if input.len() <= THRESHOLD {
         println!("processed without thread {:?}", input);
-        return input
-                .into_iter()
-                .map(f)
-                .collect();
+        return process(input, f);
     }
 
     input
         .chunks(THRESHOLD)
         .into_iter()
-        .map(|chank| -> thread::JoinHandle<Vec<R>> {
-            let owned_chank = chank.to_vec();
-            thread::spawn(move || -> Vec<R> {
+        .map(|chank| -> thread::JoinHandle<Vec<_>> {
+            let owned_chank = chank.to_owned();
+            thread::spawn(move || -> Vec<_> {
                 println!("hello from thread {:?}", owned_chank);
-                owned_chank
-                    .iter()
-                    .map(|&item| f(item) )
-                    .collect()
+                return process(owned_chank, f);
             })
         })
         .flat_map(|thread_result| thread_result.join().unwrap())
@@ -62,4 +59,3 @@ fn main() {
     let res_str_2 = helper(vec!["aa", "bb", "cc", "dd", "ee", "ff"], uppercase);
     println!("{:?}", res_str_2);
 }
-
